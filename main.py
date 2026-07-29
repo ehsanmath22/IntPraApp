@@ -61,18 +61,16 @@ system_prompt = st.sidebar.text_area(
     help="Instructions that define how the assistant behaves.",
 )
 
+if st.sidebar.button("Clear conversation"):
+    st.session_state.messages = []
+
 # Security guard: cap input length to prevent abuse (runaway token cost /
 # oversized payloads). OpenRouter still enforces its own limits, but rejecting
 # here avoids sending the request at all.
 MAX_INPUT_CHARS = 2000
 
-input_text = st.text_input(
-    "Enter your Question or Topic here",
-    max_chars=MAX_INPUT_CHARS,
-)
-
 def ask(
-    question: str,
+    messages: list[dict],
     system_prompt: str,
     model: str,
     temperature: float,
@@ -82,15 +80,23 @@ def ask(
         model=model,
         temperature=temperature,
         max_tokens=max_tokens,
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": f"Question:{question}"},
-        ],
+        messages=[{"role": "system", "content": system_prompt}, *messages],
     )
     return completion.choices[0].message.content
 
-if input_text:
-    question = input_text.strip()
+# Conversation history persists across reruns via session state.
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
+# Replay the existing conversation.
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.write(message["content"])
+
+question = st.chat_input("Ask a question or topic (interview prep)...")
+
+if question:
+    question = question.strip()
     if not question:
         st.warning("Please enter a question or topic.")
     elif len(question) > MAX_INPUT_CHARS:
@@ -99,15 +105,21 @@ if input_text:
             f"Please keep it under {MAX_INPUT_CHARS} characters."
         )
     else:
-        st.write(
-            ask(
-                question,
-                system_prompt,
-                model=model,
-                temperature=temperature,
-                max_tokens=max_tokens if limit_tokens else None,
-            )
-        )
+        st.session_state.messages.append({"role": "user", "content": question})
+        with st.chat_message("user"):
+            st.write(question)
 
-# To run this code, write-  streamlit run gemini_app_qa.py
+        with st.chat_message("assistant"):
+            with st.spinner("Thinking..."):
+                answer = ask(
+                    st.session_state.messages,
+                    system_prompt,
+                    model=model,
+                    temperature=temperature,
+                    max_tokens=max_tokens if limit_tokens else None,
+                )
+            st.write(answer)
+        st.session_state.messages.append({"role": "assistant", "content": answer})
+
+# To run this code, write-  streamlit run main.py
 
