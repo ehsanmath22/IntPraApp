@@ -42,8 +42,8 @@ Under the hood it calls `openai/gpt-4o-mini` (configurable) through
 
 ## Running the app
 
-```bash
-uv run streamlit run main.py
+```commandline
+streamlit run main.py
 ```
 
 Streamlit opens the app in your browser (usually at http://localhost:8501).
